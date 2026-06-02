@@ -1,14 +1,42 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Modal } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
-const API_URL = 'http://192.168.100.19:8000/analizar-foto/';
+const API_URL = 'http://192.168.1.207:8000/analizar-foto/';
 
 export default function App() {
   // Estados para controlar la aplicación
   const [imagen, setImagen] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [resultado, setResultado] = useState(null);
+
+  //info user
+  const [modalVisible, setModalVisible] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [ocupacion, setOcupacion] = useState('');
+  const [destino, setDestino] = useState('');
+
+  // cargar datos
+  useEffect(() => {
+    const cargarPerfil = async () => {
+      const n = await AsyncStorage.getItem('nombre');
+      const o = await AsyncStorage.getItem('ocupacion');
+      if (!n || !o) {
+        setModalVisible(true);
+      } else {
+        setNombre(n);
+        setOcupacion(o);
+      }
+    };
+    cargarPerfil();
+  }, []);
+
+  const guardarPerfil = async () => {
+    await AsyncStorage.setItem('nombre', nombre);
+    await AsyncStorage.setItem('ocupacion', ocupacion);
+    setModalVisible(false);
+  };
 
   // Función para abrir la cámara del celular
   const tomarFoto = async () => {
@@ -51,6 +79,9 @@ export default function App() {
       name: `photo.${fileType}`,
       type: `image/${fileType}`,
     });
+    formData.append('nombre', nombre);
+    formData.append('ocupacion', ocupacion);
+    formData.append('destino', destino);
 
     try {
       const response = await fetch(API_URL, {
@@ -76,55 +107,78 @@ export default function App() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.titulo}>Agente de Utilidad</Text>
-      <Text style={styles.subtitulo}>Asistente de Salida Inteligente</Text>
+      <>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.titulo}>Agente de Utilidad</Text>
+        <Text style={styles.subtitulo}>Asistente de Salida Inteligente</Text>
 
-      {/* Contenedor de la Imagen */}
-      <View style={styles.imageContainer}>
-        {imagen ? (
-          <Image source={{ uri: imagen }} style={styles.previewImage} />
-        ) : (
-          <Text style={styles.placeholderText}>No se ha capturado ninguna foto</Text>
-        )}
-      </View>
-
-      {/* Botones de Acción */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.buttonCamara} onPress={tomarFoto}>
-          <Text style={styles.buttonText}>Tomar Foto</Text>
+        <TouchableOpacity onPress={() => setModalVisible(true)}>
+          <Text style={{color: 'blue'}}>Editar Perfil</Text>
         </TouchableOpacity>
-
-        {imagen && (
-          <TouchableOpacity 
-            style={[styles.buttonAnalizar, cargando && styles.buttonDeshabilitado]} 
-            onPress={enviarAlBackend}
-            disabled={cargando}
-          >
-            <Text style={styles.buttonText}>Analizar con IA</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Animación de carga */}
-      {cargando && <ActivityIndicator size="large" color="#0000ff" style={{ marginTop: 20 }} />}
-
-      {/* Sección de Resultados del Servidor */}
-      {resultado && (
-        <View style={styles.cardResultado}>
-          <Text style={styles.cardTitulo}>Resultados del Análisis:</Text>
-          
-          <Text style={styles.objetosDetectados}>
-            <Text style={{ fontWeight: 'bold' }}>Objetos Clave:</Text> {resultado.objetos.join(', ') || 'Ninguno detectado'}
-          </Text>
-
-          <View style={styles.lineaDivisoria} />
-
-          <Text style={styles.cardSubtitulo}>Instrucciones del Asistente:</Text>
-          <Text style={styles.textoAgente}>{resultado.respuesta}</Text>
+        
+        {/* Contenedor de la Imagen */}
+        <View style={styles.imageContainer}>
+          {imagen ? (
+            <Image source={{ uri: imagen }} style={styles.previewImage} />
+          ) : (
+            <Text style={styles.placeholderText}>No se ha capturado ninguna foto</Text>
+          )}
         </View>
-      )}
-    </ScrollView>
+        {/* Sección de destino */}
+        <TextInput 
+          style={styles.input} 
+          placeholder="¿A dónde vas? (opcional)" 
+          value={destino} 
+          onChangeText={setDestino} 
+        />
+        {/* Botones de Acción */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.buttonCamara} onPress={tomarFoto}>
+            <Text style={styles.buttonText}>Tomar Foto</Text>
+          </TouchableOpacity>
+
+          {imagen && (
+            <TouchableOpacity 
+              style={[styles.buttonAnalizar, cargando && styles.buttonDeshabilitado]} 
+              onPress={enviarAlBackend}
+              disabled={cargando}
+            >
+              <Text style={styles.buttonText}>Analizar con IA</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Animación de carga */}
+        {cargando && <ActivityIndicator size="large" color="#0000ff" style={{ marginTop: 20 }} />}
+        
+        {/* Sección de Resultados del Servidor */}
+        {resultado && (
+          <View style={styles.cardResultado}>
+            <Text style={styles.cardTitulo}>Resultados del Análisis:</Text>
+
+            <Text style={styles.objetosDetectados}>
+              <Text style={{ fontWeight: 'bold' }}>Objetos Clave:</Text> {resultado.objetos.join(', ') || 'Ninguno detectado'}
+            </Text>
+
+            <View style={styles.lineaDivisoria} />
+
+            <Text style={styles.cardSubtitulo}>Instrucciones del Asistente:</Text>
+            <Text style={styles.textoAgente}>{resultado.respuesta}</Text>
+          </View>
+        )}
+        
+      </ScrollView>
+      <Modal visible={modalVisible} animationType="slide">
+        <View style={styles.modalContainer}>
+          <Text style={styles.titulo}>Bienvenido</Text>
+          <TextInput style={styles.input} placeholder="Nombre" value={nombre} onChangeText={setNombre} />
+          <TextInput style={styles.input} placeholder="Ocupación" value={ocupacion} onChangeText={setOcupacion} />
+          <TouchableOpacity style={styles.buttonAnalizar} onPress={guardarPerfil}>
+            <Text style={styles.buttonText}>Guardar Perfil</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+  </>
   );
 }
 
@@ -232,6 +286,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2f3640',
     marginBottom: 5,
+  },
+  input: {
+  width: '100%',
+  backgroundColor: '#fff',
+  padding: 15,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: '#dcdde1',
+  marginBottom: 10,
   },
   textoAgente: {
     fontSize: 15,
